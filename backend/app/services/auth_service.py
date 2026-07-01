@@ -7,9 +7,9 @@ attempt was wrong". None of that belongs in a route handler or in the
 repository.
 """
 
-from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ConflictException, UnauthorizedException
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
@@ -29,12 +29,7 @@ class AuthService:
         ignores it. Public registration can never create an admin.
         """
         if self._users.email_exists(payload.email):
-            # 409 Conflict, not 400 -- the request is well-formed, it
-            # just conflicts with existing state.
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="A user with this email already exists.",
-            )
+            raise ConflictException("A user with this email already exists.")
 
         return self._users.create(
             name=payload.name,
@@ -53,11 +48,7 @@ class AuthService:
         """
         user = self._users.get_by_email(email)
         if user is None or not verify_password(password, user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            raise UnauthorizedException("Incorrect email or password.")
         return user
 
     def create_token(self, user: User) -> str:

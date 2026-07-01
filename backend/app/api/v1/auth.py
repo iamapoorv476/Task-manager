@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.auth import Token
+from app.schemas.common import SuccessResponse
 from app.schemas.user import UserCreate, UserRead
 from app.services.auth_service import AuthService
 
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post(
     "/register",
-    response_model=UserRead,
+    response_model=SuccessResponse[UserRead],
     status_code=201,
     summary="Register a new user account",
     description=(
@@ -28,14 +29,14 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
         "client -- admin accounts are never created via public registration."
     ),
 )
-def register(payload: UserCreate, db: Session = Depends(get_db)) -> UserRead:
+def register(payload: UserCreate, db: Session = Depends(get_db)) -> SuccessResponse[UserRead]:
     user = AuthService(db).register(payload)
-    return UserRead.model_validate(user)
+    return SuccessResponse(message="User registered successfully.", data=UserRead.model_validate(user))
 
 
 @router.post(
     "/login",
-    response_model=Token,
+    response_model=SuccessResponse[Token],
     summary="Log in and obtain a JWT access token",
     description=(
         "Accepts standard OAuth2 password-flow form fields: `username` "
@@ -47,8 +48,10 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> UserRead:
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
-) -> Token:
+) -> SuccessResponse[Token]:
     service = AuthService(db)
     user = service.authenticate(email=form_data.username, password=form_data.password)
     token = service.create_token(user)
-    return Token(access_token=token, token_type="bearer")
+    return SuccessResponse(
+        message="Login successful.", data=Token(access_token=token, token_type="bearer")
+    )
