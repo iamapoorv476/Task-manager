@@ -10,7 +10,7 @@ leaking between tests via a shared global instance.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, users
+from app.api.v1 import auth, tasks, users
 from app.core.config import get_settings
 from app.core.exception_handlers import register_exception_handlers
 
@@ -44,6 +44,8 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router, prefix=settings.api_v1_prefix)
     app.include_router(users.router, prefix=settings.api_v1_prefix)
+    app.include_router(tasks.router, prefix=settings.api_v1_prefix)
+    
     register_exception_handlers(app)
 
     @app.get("/health", tags=["Health"], summary="Liveness check")

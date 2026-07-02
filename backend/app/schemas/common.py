@@ -12,6 +12,8 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
+from app.schemas.task import PaginationMeta
+
 T = TypeVar("T")
 
 
@@ -19,6 +21,18 @@ class SuccessResponse(BaseModel, Generic[T]):
     success: bool = True
     message: str
     data: T
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Envelope for list endpoints. Same {success, message, data} shape as
+    SuccessResponse, plus `meta` for pagination info -- kept as a separate
+    model rather than cramming pagination fields into SuccessResponse so
+    non-list endpoints don't carry meaningless empty pagination fields."""
+
+    success: bool = True
+    message: str
+    data: list[T]
+    meta: PaginationMeta
 
 
 class ErrorResponse(BaseModel):
