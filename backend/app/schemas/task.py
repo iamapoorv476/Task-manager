@@ -30,11 +30,24 @@ class TaskCreate(TaskBase):
     add later if a real requirement calls for it; starting restrictive is
     safer than starting permissive."""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "title": "Fix login redirect on mobile Safari",
+                "description": "Users land on a 404 after a successful login on iOS Safari only.",
+                "priority": "HIGH",
+            }
+        }
+    )
 
 class TaskUpdate(BaseModel):
     """All fields optional -- this backs PATCH (partial update), not PUT.
     Only fields the client actually sends get changed; everything else on
     the task is left untouched."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"status": "IN_PROGRESS"}}
+    )
 
     title: str | None = None
     description: str | None = None
@@ -55,7 +68,21 @@ class TaskUpdate(BaseModel):
 
 
 class TaskRead(TaskBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "9c858901-8a57-4791-81fe-4c455b099bc9",
+                "title": "Fix login redirect on mobile Safari",
+                "description": "Users land on a 404 after a successful login on iOS Safari only.",
+                "priority": "HIGH",
+                "status": "IN_PROGRESS",
+                "owner_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "created_at": "2026-06-01T09:20:00Z",
+                "updated_at": "2026-06-01T14:05:00Z",
+            }
+        },
+    )
 
     id: uuid.UUID
     status: TaskStatus

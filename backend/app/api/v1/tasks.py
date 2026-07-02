@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.config import get_settings
+from app.core.openapi_responses import NOT_FOUND, UNAUTHORIZED, VALIDATION_ERROR
 from app.db.session import get_db
 from app.models.task import TaskPriority, TaskStatus
 from app.models.user import User
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/tasks", tags=["Tasks"])
     status_code=201,
     summary="Create a task",
     description="The authenticated user becomes the task's owner. Every new task starts as TODO.",
+    responses={**UNAUTHORIZED, **VALIDATION_ERROR},
 )
 def create_task(
     payload: TaskCreate,
@@ -46,21 +48,25 @@ def create_task(
     response_model=PaginatedResponse[TaskRead],
     summary="List tasks (paginated, filterable, searchable, sortable)",
     description=(
-        "Regular users see only their own tasks. Admins see all tasks. "
-        "Supports filtering by status/priority, free-text search across "
-        "title and description, and sorting by any whitelisted field."
+        "A regular user gets back their own tasks; an admin gets everyone's. "
+        "The filters below all combine -- e.g. `status=TODO&priority=HIGH&search=login` "
+        "narrows to high-priority, unfinished tasks mentioning \"login\"."
     ),
+    responses={**UNAUTHORIZED, **VALIDATION_ERROR},
 )
 def list_tasks(
-    page: int = Query(1, ge=1, description="1-indexed page number"),
+    page: int = Query(1, ge=1, description="1-indexed page number."),
     limit: int = Query(
-        settings.default_page_size, ge=1, le=settings.max_page_size, description="Items per page"
+        settings.default_page_size, ge=1, le=settings.max_page_size, description="Items per page."
     ),
-    status_filter: TaskStatus | None = Query(None, alias="status"),
-    priority: TaskPriority | None = Query(None),
-    search: str | None = Query(None, min_length=1, max_length=200, description="Searches title and description"),
-    sort_by: SortField = Query("created_at"),
-    sort_order: SortOrder = Query("desc"),
+    status_filter: TaskStatus | None = Query(None, alias="status", description="Filter by exact status."),
+    priority: TaskPriority | None = Query(None, description="Filter by exact priority."),
+    search: str | None = Query(
+        None, min_length=1, max_length=200, description="Case-insensitive match against title and description.",
+        examples=["login bug"],
+    ),
+    sort_by: SortField = Query("created_at", description="Column to sort by."),
+    sort_order: SortOrder = Query("desc", description="asc or desc."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> PaginatedResponse[TaskRead]:
@@ -86,7 +92,12 @@ def list_tasks(
     "/{task_id}",
     response_model=SuccessResponse[TaskRead],
     summary="Get a single task by id",
-    description="Returns 404 for tasks that don't exist AND for tasks that exist but belong to someone else.",
+    description=(
+        "Returns 404 both when the task genuinely doesn't exist and when it belongs "
+        "to someone else -- I didn't want the error code itself to confirm another "
+        "user's task exists."
+    ),
+    responses={**UNAUTHORIZED, **NOT_FOUND},
 )
 def get_task(
     task_id: uuid.UUID,
@@ -101,7 +112,8 @@ def get_task(
     "/{task_id}",
     response_model=SuccessResponse[TaskRead],
     summary="Partially update a task",
-    description="Only fields included in the request body are changed. Owner or admin only.",
+    description="Only the fields you include in the body get changed. Owner or admin only.",
+    responses={**UNAUTHORIZED, **NOT_FOUND, **VALIDATION_ERROR},
 )
 def update_task(
     task_id: uuid.UUID,
@@ -117,7 +129,8 @@ def update_task(
     "/{task_id}",
     status_code=204,
     summary="Delete a task",
-    description="Owner or admin only. Returns 204 No Content on success, per HTTP semantics for DELETE.",
+    description="Owner or admin only. Returns 204 with no body on success, which is correct REST for a DELETE.",
+    responses={**UNAUTHORIZED, **NOT_FOUND},
 )
 def delete_task(
     task_id: uuid.UUID,
