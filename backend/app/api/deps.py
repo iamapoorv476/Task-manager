@@ -8,7 +8,7 @@ to proceed" is decided.
 
 import uuid
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
@@ -33,6 +33,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/lo
 
 
 def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
@@ -48,6 +49,16 @@ def get_current_user(
     later). The cost is one indexed primary-key lookup per authenticated
     request -- cheap, and a reasonable trade for that correctness
     guarantee at this scale.
+
+    Also records the resolved user's id onto `request.state.user_id`.
+    This is for the request-logging middleware: it needs to know who
+    made the request in its final log line, but that line is written
+    AFTER route handling completes, by which point structlog's
+    contextvars binding isn't reliably visible back in the middleware
+    (BaseHTTPMiddleware can run route handling in a way that doesn't
+    propagate contextvar changes back out). request.state is a plain
+    mutable attribute on the same Request object shared by both, so it
+    sidesteps that problem entirely.
     """
     try:
         payload = decode_access_token(token)
@@ -61,6 +72,8 @@ def get_current_user(
     user = UserRepository(db).get_by_id(user_id)
     if user is None:
         raise UnauthorizedException
+
+    request.state.user_id = str(user.id)
     return user
 
 
